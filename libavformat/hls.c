@@ -33,6 +33,7 @@
 #include "libavutil/mathematics.h"
 #include "libavutil/opt.h"
 #include "libavutil/dict.h"
+#include "libavutil/base64.h"
 #include "libavutil/time.h"
 #include "avformat.h"
 #include "internal.h"
@@ -1224,6 +1225,19 @@ static int open_input(HLSContext *c, struct playlist *pls, struct segment *seg, 
                            seg->key);
                 }
                 ff_format_io_close(pls->parent, &pb);
+            } else if (NULL != seg->key && strstr(seg->key, "data:")) {
+                int key_offset = 0;
+                if (strstr(seg->key, "data:;base64,")) {
+                    key_offset = 13;
+                } else if (strstr(seg->key, "data:text/plain;base64,")) {
+                    key_offset = 23;
+                }
+                if (key_offset > 0) {
+                    av_log(NULL, AV_LOG_INFO, "Use data key %s\n", &seg->key[key_offset]);
+                    av_base64_decode(pls->key, &seg->key[key_offset], sizeof(pls->key));
+                } else {
+                    av_log(NULL, AV_LOG_ERROR, "Unable to use data key %s\n", seg->key);
+                }
             } else {
                 av_log(pls->parent, AV_LOG_ERROR, "Unable to open key file %s\n",
                        seg->key);
